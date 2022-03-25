@@ -1,11 +1,11 @@
 [package]
-name = "smart-wallet-wallet"
+name = "smartwallet-wallet"
 version = "0.2.0"
 authors = ["jc"]
 edition = "2018"
 license = "Apache-2.0"
-description = "A Goverance contract for Anchor Protocol - allows a user to create poll and do vote"
-repository = "https://github.com/Anchor-Protocol/anchor-token-contracts"
+description = "shitty smart wallet for relatively safe degening"
+repository = "https://github.com/johnjchang/smart_wallet"
 
 exclude = [
   # Those files are rust-optimizer artifacts. You might want to commit them for convenience but they should not be part of the source code publication.

@@ -221,12 +221,9 @@ pub fn cold_confirm(
     }
 
     state.cold_confirmers.push(info.sender);
-
-    //TODO: need to persist list of confirmers
-
     let mut messages = vec![];
 
-    //xth confirm kicks off the tx
+    //threshold'th confirm kicks off the tx
     if state.cold_confirmers.len() >= config.threshold{
         if state.cold_running == 1u64 {
             let bank_msg: CosmosMsg<TerraMsgWrapper> = CosmosMsg::Bank(BankMsg::Send {
