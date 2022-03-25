@@ -41,7 +41,6 @@ pub struct ConfigResponse {
     pub cold_wallets: Vec<Addr>,
     pub threshold: usize,
     pub max_expiration: u64,
-}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 pub struct StateResponse {
