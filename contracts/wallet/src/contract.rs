@@ -13,6 +13,8 @@ use crate::state::{CONFIG, STATE, Config, State, NativeTransfer, WasmExecute};
 use terra_cosmwasm::TerraMsgWrapper;
 use std::cmp::{max, min};
 use crate::tax_querier::deduct_tax;
+use moneymarket::market::ExecuteMsg::DepositStable;
+use basset::reward::ExecuteMsg::ClaimRewards;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -55,7 +57,7 @@ pub fn execute(
     match msg {
 
         ExecuteMsg::ColdWasmExecute { address, command, expiration } => cold_execute(deps, env, info, address, command, expiration),
-        ExecuteMsg::AnchorEarnDeposit {} => anchor_earn_deposit(deps, env, info), 
+        ExecuteMsg::AnchorEarnDeposit { amount } => anchor_earn_deposit(deps, env, info, amount), 
         ExecuteMsg::BlunaClaim{} => bluna_claim(deps, env, info),
         ExecuteMsg::ColdConfirm {} => cold_confirm(deps, env, info),
         ExecuteMsg::ChangeHotWallet{ address } => update_hot_wallet(deps, env, info, address),
@@ -139,6 +141,7 @@ pub fn anchor_earn_deposit(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    amount: Uint128,
 ) -> StdResult<Response<TerraMsgWrapper>> {
 
     let config: Config = CONFIG.load(deps.storage)?;
@@ -147,8 +150,18 @@ pub fn anchor_earn_deposit(
         return Err(StdError::generic_err("Unauthorized"));
     }
 
-    Ok(Response::new().add_attributes(vec![("action", "update_config")]))
+    let contract_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: String::from("terra1sepfj7s0aeg5967uxnfk4thzlerrsktkpelm5s"),
+        funds: vec![Coin{
+            denom: String::from("uusd"),
+            amount: amount,
+        }],
+        msg: to_binary(&DepositStable{})?,
+    });
+
+    Ok(Response::new().add_attributes(vec![("action", "update_config")]).add_message(contract_msg))
 }
+
 
 #[allow(clippy::too_many_arguments)]
 pub fn bluna_claim(
@@ -163,7 +176,13 @@ pub fn bluna_claim(
         return Err(StdError::generic_err("Unauthorized"));
     }
 
-    Ok(Response::new().add_attributes(vec![("action", "update_config")]))
+    Ok(Response::new()
+        .add_attributes(vec![("action", "update_config")])
+        .add_message(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: String::from("terra17yap3mhph35pcwvhza38c2lkj7gzywzy05h7l0"),
+        funds: vec![],
+        msg: to_binary(&ClaimRewards{recipient: None})?,
+    })))
 }
 
 #[allow(clippy::too_many_arguments)]

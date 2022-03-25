@@ -15,7 +15,7 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    AnchorEarnDeposit {},
+    AnchorEarnDeposit {amount: Uint128},
     BlunaClaim {},
     ColdWasmExecute {address: String, command: Binary, expiration: Option<u64>},
     ColdNativeTransfer {address: String, denom: String, amount: Uint128, expiration: Option<u64>},
