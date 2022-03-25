@@ -17,10 +17,15 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
     AnchorEarnDeposit {amount: Uint128},
     BlunaClaim {},
+
+    //make this take an array of messages
     ColdWasmExecute {address: String, command: Binary, expiration: Option<u64>},
+
     ColdNativeTransfer {address: String, denom: String, amount: Uint128, expiration: Option<u64>},
     ColdConfirm {}, 
     ChangeHotWallet {address: String},
+
+    //add message for hot wallet to siphon "gas money" from contract, with a cooldown
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

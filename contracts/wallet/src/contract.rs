@@ -56,6 +56,7 @@ pub fn execute(
 ) -> StdResult<Response<TerraMsgWrapper>> {
     match msg {
 
+        //this should take an array like gov proposal messages
         ExecuteMsg::ColdWasmExecute { address, command, expiration } => cold_execute(deps, env, info, address, command, expiration),
         ExecuteMsg::AnchorEarnDeposit { amount } => anchor_earn_deposit(deps, env, info, amount), 
         ExecuteMsg::BlunaClaim{} => bluna_claim(deps, env, info),
