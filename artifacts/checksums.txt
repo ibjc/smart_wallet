@@ -1,0 +1,2 @@
+cd733fd9075cb74fc6d36aaeb0c43788214d09787a29e7ceab53acb2e2d889fb  scratch_incrementer.wasm
+3f838fa0e0532c1ea441038e7955e3dbd0f2d8afc100f10f901fa2b3fce813e7  smart_wallet_incrementer.wasm

@@ -21,13 +21,7 @@ pub enum ExecuteMsg {
     ColdWasmExecute {address: String, command: Binary, expiration: Option<u64>},
     ColdNativeTransfer {address: String, denom: String, amount: Uint128, expiration: Option<u64>},
     ColdConfirm {}, 
-    UpdateConfig {
-        hot_wallet: Option<String>,
-        cold_wallets: Option<Vec<String>>,
-        cold_x: Option<u64>,
-        cold_n: Option<u64>,
-        max_expiration: Option<u64>,
-    },
+    ChangeHotWallet {address: String},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -68,3 +62,4 @@ pub struct WasmExecuteResponse{
     pub address: Addr,
     pub message: Binary,
 }
+

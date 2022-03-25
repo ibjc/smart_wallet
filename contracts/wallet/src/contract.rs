@@ -60,11 +60,10 @@ pub fn execute(
         ExecuteMsg::AnchorEarnDeposit {} => anchor_earn_deposit(deps, env, info), 
         ExecuteMsg::BlunaClaim{} => bluna_claim(deps, env, info),
         ExecuteMsg::ColdConfirm {} => cold_confirm(deps, env, info),
-        ExecuteMsg::UpdateConfig{ hot_wallet, cold_wallets, cold_x, cold_n, max_expiration } => update_config(deps, env, info, hot_wallet, cold_wallets, cold_x, cold_n, max_expiration),
+        ExecuteMsg::ChangeHotWallet{ address } => update_hot_wallet(deps, env, info, address),
         ExecuteMsg::ColdNativeTransfer { address, denom, amount, expiration } => cold_native(deps, env, info, address, denom, amount, expiration),
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 pub fn cold_native(
@@ -95,6 +94,7 @@ pub fn cold_native(
     state.cold_running = 1u64;
     state.expiration = env.block.time.seconds() + max(min(expiration.unwrap_or(config.max_expiration), config.max_expiration), 0);
     state.cold_native_transfer = NativeTransfer{address: deps.api.addr_validate(&address)?, denom: denom, amount: amount};
+    state.cold_x = 1u64;
 
     STATE.save(deps.storage, &state);
 
@@ -193,6 +193,7 @@ pub fn cold_confirm(
     if state.expiration < env.block.time.seconds(){
         state.cold_running = 0u64;
         state.cold_x = 0u64;
+        state.expiration = 0u64;
         STATE.save(deps.storage, &state);
         return Err(StdError::generic_err("cold msg expired; reverting"));
     }
@@ -201,17 +202,10 @@ pub fn cold_confirm(
 
     //TODO: need to persist list of confirmers
 
-    let res = Response::new()
-    .add_attributes(vec![
-        attr("action", "cold_confirm"),
-    ]);
-
     let mut messages = vec![];
 
     //xth confirm kicks off the tx
     if state.cold_x >= config.cold_x{
-        state.cold_x = 0u64;
-
         if state.cold_running == 1u64 {
             let bank_msg: CosmosMsg<TerraMsgWrapper> = CosmosMsg::Bank(BankMsg::Send {
                 to_address: state.cold_native_transfer.address.to_string(),
@@ -237,58 +231,42 @@ pub fn cold_confirm(
             messages.push(contract_msg);
         }
 
+        state.cold_x = 0u64;
+        state.expiration = 0u64;
         state.cold_running = 0u64;
     }
 
     STATE.save(deps.storage, &state);
 
-    Ok(res.add_messages(messages))
+    let res = Response::new()
+    .add_attributes(vec![
+        attr("action", "cold_confirm"),
+    ])
+    .add_messages(messages);
+
+    Ok(res)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn update_config(
+pub fn update_hot_wallet(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    hot_wallet: Option<String>,
-    cold_wallets: Option<Vec<String>>,
-    cold_x: Option<u64>,
-    cold_n: Option<u64>,
-    max_expiration: Option<u64>,
+    hot_wallet: String
 ) -> StdResult<Response<TerraMsgWrapper>> {
 
     let mut config: Config = CONFIG.load(deps.storage)?;
-    let mut state: State = STATE.load(deps.storage)?;
 
     //check privs
     if !config.cold_wallets.contains(&info.sender){
         return Err(StdError::generic_err("Unauthorized"));
     }
 
-    //check existing cold executed
-    if state.cold_running > 0u64{
-        return Err(StdError::generic_err("cold msg in progress"));
-    }
-
-    if let Some(hot_wallet) = hot_wallet {
-        config.hot_wallet =  deps.api.addr_validate(&hot_wallet)?;
-    }
-
-    if let Some(cold_x) = cold_x {
-        config.cold_x =  cold_x;
-    }
-
-    if let Some(cold_n) = cold_n {
-        config.cold_n =  cold_n;
-    }
-
-    if let Some(max_expiration) = max_expiration {
-        config.max_expiration =  max_expiration;
-    }
+    config.hot_wallet = deps.api.addr_validate(&hot_wallet)?;
 
     CONFIG.save(deps.storage, &config);
 
-    Ok(Response::new().add_attributes(vec![("action", "update_config")]))
+    Ok(Response::new().add_attributes(vec![("action", "changed hot wallet")]))
 }
 
 

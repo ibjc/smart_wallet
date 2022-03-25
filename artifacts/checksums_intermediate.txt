@@ -1,0 +1,1 @@
+ae52d401f7c1fca76ea550ffdb1c07d5fb40b9bedd9b8547ac738b07507faae6  target/wasm32-unknown-unknown/release/smart_wallet_incrementer.wasm
