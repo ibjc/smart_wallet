@@ -27,16 +27,14 @@ pub fn instantiate(
     let config = Config {
         hot_wallet: deps.api.addr_validate(&msg.hot_wallet)?,
         cold_wallets: cold_wallets,
-        cold_x: msg.cold_x,
-        cold_n: msg.cold_n,
+        threshold: msg.threshold,
         max_expiration: msg.max_expiration,
     };
 
     let state = State {
         cold_running: 0u64,
         expiration: 064,
-        cold_x: 064,
-        cold_n: msg.cold_n,
+        cold_confirmers: vec![],
         cold_native_transfer: NativeTransfer{address: deps.api.addr_humanize(&CanonicalAddr::from(vec![]))?, denom: String::from(""), amount: Uint128::zero()},
         cold_wasm_execute: WasmExecute{address: deps.api.addr_humanize(&CanonicalAddr::from(vec![]))?, message: Binary::from(vec![])},
     };
@@ -94,7 +92,7 @@ pub fn cold_native(
     state.cold_running = 1u64;
     state.expiration = env.block.time.seconds() + max(min(expiration.unwrap_or(config.max_expiration), config.max_expiration), 0);
     state.cold_native_transfer = NativeTransfer{address: deps.api.addr_validate(&address)?, denom: denom, amount: amount};
-    state.cold_x = 1u64;
+    state.cold_confirmers.push(info.sender);
 
     STATE.save(deps.storage, &state);
 
@@ -129,7 +127,7 @@ pub fn cold_execute(
     state.cold_running = 2u64;
     state.expiration = env.block.time.seconds() + max(min(expiration.unwrap_or(config.max_expiration), config.max_expiration), 0);
     state.cold_wasm_execute = WasmExecute{address: deps.api.addr_validate(&address)?, message: command};
-    state.cold_x = 1u64;
+    state.cold_confirmers.push(info.sender);
 
     STATE.save(deps.storage, &state);
 
@@ -192,20 +190,25 @@ pub fn cold_confirm(
     //check if expired
     if state.expiration < env.block.time.seconds(){
         state.cold_running = 0u64;
-        state.cold_x = 0u64;
+        state.cold_confirmers = vec![];
         state.expiration = 0u64;
         STATE.save(deps.storage, &state);
         return Err(StdError::generic_err("cold msg expired; reverting"));
     }
 
-    state.cold_x += 1u64;
+    //check if already confirmed
+    if state.cold_confirmers.contains(&info.sender){
+        return Err(StdError::generic_err("already confirmed"));
+    }
+
+    state.cold_confirmers.push(info.sender);
 
     //TODO: need to persist list of confirmers
 
     let mut messages = vec![];
 
     //xth confirm kicks off the tx
-    if state.cold_x >= config.cold_x{
+    if state.cold_confirmers.len() >= config.threshold{
         if state.cold_running == 1u64 {
             let bank_msg: CosmosMsg<TerraMsgWrapper> = CosmosMsg::Bank(BankMsg::Send {
                 to_address: state.cold_native_transfer.address.to_string(),
@@ -231,7 +234,7 @@ pub fn cold_confirm(
             messages.push(contract_msg);
         }
 
-        state.cold_x = 0u64;
+        state.cold_confirmers = vec![];
         state.expiration = 0u64;
         state.cold_running = 0u64;
     }
@@ -285,8 +288,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         hot_wallet: (&config).hot_wallet.to_string(),
         cold_wallets: config.cold_wallets,
-        cold_x: config.cold_x,
-        cold_n: config.cold_n,
+        threshold: config.threshold,
         max_expiration: config.max_expiration,
     })
   }
@@ -296,8 +298,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(StateResponse {
         cold_running: state.cold_running,
         expiration: state.expiration,
-        cold_x: state.cold_x,
-        cold_n: state.cold_n,
+        cold_confirmers: state.cold_confirmers,
         cold_native_transfer: NativeTransferResponse{address: state.cold_native_transfer.address, denom: state.cold_native_transfer.denom, amount: state.cold_native_transfer.amount},
         cold_wasm_execute: WasmExecuteResponse{address: state.cold_wasm_execute.address, message: state.cold_wasm_execute.message}
     })

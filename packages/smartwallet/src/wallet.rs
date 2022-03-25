@@ -8,8 +8,7 @@ use std::fmt;
 pub struct InstantiateMsg {
     pub hot_wallet: String,
     pub cold_wallets: Vec<String>,
-    pub cold_x: u64,
-    pub cold_n: u64,
+    pub threshold: usize,
     pub max_expiration: u64,
 }
 
@@ -35,8 +34,7 @@ pub enum QueryMsg {
 pub struct ConfigResponse {
     pub hot_wallet: String,
     pub cold_wallets: Vec<Addr>,
-    pub cold_x: u64,
-    pub cold_n: u64,
+    pub threshold: usize,
     pub max_expiration: u64,
 }
 
@@ -44,8 +42,7 @@ pub struct ConfigResponse {
 pub struct StateResponse {
     pub cold_running: u64,
     pub expiration: u64,
-    pub cold_x: u64,
-    pub cold_n: u64,
+    pub cold_confirmers: Vec<Addr>,
     pub cold_native_transfer: NativeTransferResponse,
     pub cold_wasm_execute: WasmExecuteResponse,
 }

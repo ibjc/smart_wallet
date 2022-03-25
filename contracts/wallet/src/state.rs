@@ -11,8 +11,7 @@ pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 pub struct Config {
     pub hot_wallet: Addr,
     pub cold_wallets: Vec<Addr>,
-    pub cold_x: u64,
-    pub cold_n: u64,
+    pub threshold: usize,
     pub max_expiration: u64,
 }
 
@@ -20,8 +19,7 @@ pub struct Config {
 pub struct State {
     pub cold_running: u64,
     pub expiration: u64,
-    pub cold_x: u64,
-    pub cold_n: u64,
+    pub cold_confirmers: Vec<Addr>,
     pub cold_native_transfer: NativeTransfer,
     pub cold_wasm_execute: WasmExecute,
 }
