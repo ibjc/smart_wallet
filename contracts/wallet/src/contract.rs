@@ -312,6 +312,7 @@ pub fn query_hot_wallet_state(deps: Deps, env: Env, address: String) -> StdResul
 
     let hot_wallet: HotWalletState = HOT_WALLETS.may_load(deps.storage, address)?.unwrap_or(HotWalletState{address: String::from(""), last_gas_fillup: env.block.time.seconds()});
 
+    //gas_time_left is janky; it's the num seconds since last fillup
     Ok(HotWalletStateResponse{
         address: hot_wallet.address,
         gas_time_left: max(env.block.time.seconds() - hot_wallet.last_gas_fillup, 0u64)
