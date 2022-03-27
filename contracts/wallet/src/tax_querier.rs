@@ -1,6 +1,8 @@
-use cosmwasm_std::{Coin, Decimal, QuerierWrapper, StdResult, Uint128};
+use cosmwasm_std::{Coin, Decimal, QuerierWrapper, StdResult, Uint128, Deps, BalanceResponse, QueryRequest, BankQuery};
 
 use terra_cosmwasm::TerraQuerier;
+
+
 
 static DECIMAL_FRACTION: Uint128 = Uint128::new(1_000_000_000_000_000_000u128);
 
@@ -23,4 +25,13 @@ pub fn deduct_tax(querier: &QuerierWrapper, coin: Coin) -> StdResult<Coin> {
         denom: coin.denom,
         amount: (coin.amount.checked_sub(tax_amount))?,
     })
+}
+
+pub fn query_balance(deps: Deps, account_addr: String, denom: String) -> StdResult<Uint128> {
+    // load price form the oracle
+    let balance: BalanceResponse = deps.querier.query(&QueryRequest::Bank(BankQuery::Balance {
+        address: account_addr,
+        denom,
+    }))?;
+    Ok(balance.amount.amount.into())
 }
