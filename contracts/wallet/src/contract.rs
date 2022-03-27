@@ -15,6 +15,7 @@ use std::cmp::{max, min};
 use crate::tax_querier::{query_balance, deduct_tax};
 use moneymarket::market::ExecuteMsg::DepositStable;
 use basset::reward::ExecuteMsg::ClaimRewards;
+use crate::error::ContractError;
 
 pub const GAS_BUFFER: u64 = 100000000u64;
 
@@ -146,7 +147,7 @@ pub fn execute_fill_up_gas(
         return Err(StdError::generic_err("unauthorized wallet"));
     }
 
-    let hot_wallet_state = HOT_WALLETS
+    let mut hot_wallet_state = HOT_WALLETS
         .may_load(deps.storage, info.sender.to_string())?
         .unwrap_or(
             HotWalletState{
@@ -180,6 +181,10 @@ pub fn execute_fill_up_gas(
         )?]
     });
 
+    hot_wallet_state.last_gas_fillup = env.block.time.seconds();
+
+    HOT_WALLETS.save(deps.storage, info.sender.to_string(), &hot_wallet_state);
+
     Ok(Response::new().add_attributes(vec![("action", "fill_up_gas")]).add_message(bank_msg))
 }
 
@@ -190,6 +195,28 @@ pub fn execute_remove_hot(
     info: MessageInfo,
     address: String,
 ) -> StdResult<Response<TerraMsgWrapper>> {
+
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    //multisig check
+    if info.sender.to_string() != config.cw3_address{
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == address);
+
+    //check if valid hot address
+    if hot_wallet_config.is_none(){
+        return Err(StdError::generic_err("invalid hot address"));
+    }
+
+    //remove from state
+    HOT_WALLETS.remove(deps.storage, address.clone());
+
+    //remove from config
+    config.hot_wallets.retain(|x| x.address != address);
+
+    CONFIG.save(deps.storage, &config);
 
     Ok(Response::new().add_attributes(vec![("action", "remove_hot")]))
 }
@@ -202,6 +229,22 @@ pub fn execute_upsert_hot(
     hot_wallet: HotWallet,
 ) -> StdResult<Response<TerraMsgWrapper>> {
 
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    //multisig check
+    if info.sender.to_string() != config.cw3_address{
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    //check if valid hot address
+    let address: Addr = deps.api.addr_validate(&hot_wallet.address)?;
+
+    //remove from config
+    config.hot_wallets.retain(|x| x.address != address);
+    config.hot_wallets.push(hot_wallet);
+
+    CONFIG.save(deps.storage, &config);
+
     Ok(Response::new().add_attributes(vec![("action", "upsert_hot")]))
 }
 
@@ -213,6 +256,17 @@ pub fn execute_replace_multisig(
     address: String,
 ) -> StdResult<Response<TerraMsgWrapper>> {
 
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    //multisig check
+    if info.sender.to_string() != config.cw3_address{
+        return Err(StdError::generic_err("unauthorized"));
+    }
+
+    config.cw3_address = deps.api.addr_validate(&address)?;
+
+    CONFIG.save(deps.storage, &config);
+
     Ok(Response::new().add_attributes(vec![("action", "replace_multisig")]))
 }
 
@@ -223,6 +277,13 @@ pub fn execute_command(
     info: MessageInfo,
     command: CosmosMsg,
 ) -> StdResult<Response<TerraMsgWrapper>> {
+
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    //multisig check
+    if info.sender.to_string() != config.cw3_address{
+        return Err(StdError::generic_err("unauthorized"));
+    }
 
     Ok(Response::new().add_attributes(vec![("action", "execute_command")]))
 }
