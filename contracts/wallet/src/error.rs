@@ -11,4 +11,17 @@ pub enum ContractError {
 
   #[error("unauthorized")]
   Unauthorized {},
+
+  #[error("unauthorized action")]
+  UnauthorizedAction {},
+
+  #[error("gas cooldown not done")]
+  GasCooldown {},
+
+  #[error("smart_wallet insufficient gas")]
+  SmartWalletGas {},
+
+  #[error("hot address does not exist")]
+  InvalidHotAddress {},
+
 }

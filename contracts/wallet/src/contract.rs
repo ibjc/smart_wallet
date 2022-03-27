@@ -25,7 +25,7 @@ pub fn instantiate(
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let config = Config {
         hot_wallets: msg.hot_wallets,
@@ -43,7 +43,7 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
     match msg {
 
         //hot wallet actions
@@ -70,7 +70,7 @@ pub fn execute_anchor_earn_deposit(
     env: Env,
     info: MessageInfo,
     amount: Uint128,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
     let id = 0u64;
@@ -79,15 +79,15 @@ pub fn execute_anchor_earn_deposit(
 
     //hot wallet check
     if hot_wallet_config.is_none(){
-        return Err(StdError::generic_err("unauthorized wallet"));
+        return Err(ContractError::Unauthorized{});
     }
 
     //hot wallet is enabled for this action
     if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == id).is_none(){
-        return Err(StdError::generic_err("unauthorized action"));
+        return Err(ContractError::UnauthorizedAction{});
     }
 
-    let earn_msg: CosmosMsg<TerraMsgWrapper> = CosmosMsg::Wasm(WasmMsg::Execute {
+    let earn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: String::from("terra1sepfj7s0aeg5967uxnfk4thzlerrsktkpelm5s"),
         funds: vec![Coin{
             denom: String::from("uusd"),
@@ -104,7 +104,7 @@ pub fn execute_bluna_claim_rewards(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
     let id = 1u64;
@@ -113,15 +113,15 @@ pub fn execute_bluna_claim_rewards(
 
     //hot wallet check
     if hot_wallet_config.is_none(){
-        return Err(StdError::generic_err("unauthorized wallet"));
+        return Err(ContractError::Unauthorized{});
     }
 
     //hot wallet is enabled for this action
     if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == id).is_none(){
-        return Err(StdError::generic_err("unauthorized action"));
+        return Err(ContractError::UnauthorizedAction{});
     }
 
-    let claim_msg: CosmosMsg<TerraMsgWrapper> = CosmosMsg::Wasm(WasmMsg::Execute {
+    let claim_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: String::from("terra17yap3mhph35pcwvhza38c2lkj7gzywzy05h7l0"),
         funds: vec![],
         msg: to_binary(&ClaimRewards{recipient: None})?,
@@ -136,7 +136,7 @@ pub fn execute_fill_up_gas(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
 
@@ -144,7 +144,7 @@ pub fn execute_fill_up_gas(
 
     //hot wallet check
     if hot_wallet_config.is_none(){
-        return Err(StdError::generic_err("unauthorized wallet"));
+        return Err(ContractError::Unauthorized{});
     }
 
     let mut hot_wallet_state = HOT_WALLETS
@@ -157,7 +157,7 @@ pub fn execute_fill_up_gas(
 
     //cooldown check
     if hot_wallet_state.last_gas_fillup + hot_wallet_config.unwrap().gas_cooldown > env.block.time.seconds(){
-        return Err(StdError::generic_err("gas cooldown not done"));
+        return Err(ContractError::GasCooldown{});
     }
 
     //figure out how much gas needed to fill hot wallet's tank
@@ -167,10 +167,10 @@ pub fn execute_fill_up_gas(
 
     //sufficient smart_wallet uusd check
     if query_balance(deps.as_ref(), env.contract.address.to_string(), String::from("uusd")).unwrap() < hot_wallet_gas_need + Uint128::from(GAS_BUFFER) {
-        return Err(StdError::generic_err("smart_wallet does not have enough gas"));
+        return Err(ContractError::SmartWalletGas{});
     }
 
-    let bank_msg: CosmosMsg<TerraMsgWrapper> = CosmosMsg::Bank(BankMsg::Send{
+    let bank_msg = CosmosMsg::Bank(BankMsg::Send{
         to_address: info.sender.to_string(),
         amount: vec![deduct_tax(
             &deps.querier,
@@ -194,20 +194,20 @@ pub fn execute_remove_hot(
     env: Env,
     info: MessageInfo,
     address: String,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let mut config: Config = CONFIG.load(deps.storage)?;
 
     //multisig check
     if info.sender.to_string() != config.cw3_address{
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized{});
     }
 
     let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == address);
 
     //check if valid hot address
     if hot_wallet_config.is_none(){
-        return Err(StdError::generic_err("invalid hot address"));
+        return Err(ContractError::InvalidHotAddress{});
     }
 
     //remove from state
@@ -227,13 +227,13 @@ pub fn execute_upsert_hot(
     env: Env,
     info: MessageInfo,
     hot_wallet: HotWallet,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let mut config: Config = CONFIG.load(deps.storage)?;
 
     //multisig check
     if info.sender.to_string() != config.cw3_address{
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized{});
     }
 
     //check if valid hot address
@@ -254,13 +254,13 @@ pub fn execute_replace_multisig(
     env: Env,
     info: MessageInfo,
     address: String,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let mut config: Config = CONFIG.load(deps.storage)?;
 
     //multisig check
     if info.sender.to_string() != config.cw3_address{
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized{});
     }
 
     config.cw3_address = deps.api.addr_validate(&address)?;
@@ -276,16 +276,16 @@ pub fn execute_command(
     env: Env,
     info: MessageInfo,
     command: CosmosMsg,
-) -> StdResult<Response<TerraMsgWrapper>> {
+) -> Result<Response, ContractError> {
 
     let mut config: Config = CONFIG.load(deps.storage)?;
 
     //multisig check
     if info.sender.to_string() != config.cw3_address{
-        return Err(StdError::generic_err("unauthorized"));
+        return Err(ContractError::Unauthorized{});
     }
 
-    Ok(Response::new().add_attributes(vec![("action", "execute_command")]))
+    Ok(Response::new().add_attributes(vec![("action", "execute_command")]).add_message(command))
 }
 
 
