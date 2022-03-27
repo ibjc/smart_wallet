@@ -2,37 +2,20 @@ use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128, Addr, De
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cw_storage_plus::Item;
+use cw_storage_plus::{Map, Item, Bound};
+use smartwallet::wallet::{HotWallet};
 
-pub const STATE: Item<State> = Item::new("\u{0}\u{5}state");
+pub const HOT_WALLETS: Map<String, HotWalletState> = Map::new("hotwallets");
 pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
-    pub hot_wallet: Addr,
-    pub cold_wallets: Vec<Addr>,
-    pub threshold: usize,
-    pub max_expiration: u64,
+    pub hot_wallets: Vec<HotWallet>,
+    pub cw3_address: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct State {
-    pub cold_running: u64,
-    pub expiration: u64,
-    pub cold_confirmers: Vec<Addr>,
-    pub cold_native_transfer: NativeTransfer,
-    pub cold_wasm_execute: WasmExecute,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct NativeTransfer{
-    pub address: Addr,
-    pub denom: String,
-    pub amount: Uint128,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct WasmExecute{
-    pub address: Addr,
-    pub message: Binary,
+pub struct HotWalletState {
+    pub address: String,
+    pub last_gas_fillup: u64,
 }
