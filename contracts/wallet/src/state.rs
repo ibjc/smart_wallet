@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use cw_storage_plus::{Map, Item, Bound};
-use smartwallet::wallet::{HotWallet};
+use smartwallet::wallet::{HotWallet, WhitelistedContract};
 
 pub const HOT_WALLETS: Map<String, HotWalletState> = Map::new("hotwallets");
 pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
@@ -12,6 +12,7 @@ pub const CONFIG: Item<Config> = Item::new("\u{0}\u{6}config");
 pub struct Config {
     pub hot_wallets: Vec<HotWallet>,
     pub cw3_address: Addr,
+    pub whitelisted_contracts: Vec<WhitelistedContract>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

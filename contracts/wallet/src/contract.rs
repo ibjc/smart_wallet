@@ -18,6 +18,8 @@ use basset::reward::ExecuteMsg::ClaimRewards;
 use crate::error::ContractError;
 
 pub const GAS_BUFFER: u64 = 100000000u64;
+pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
+pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -30,6 +32,7 @@ pub fn instantiate(
     let config = Config {
         hot_wallets: msg.hot_wallets,
         cw3_address: deps.api.addr_validate(&msg.cw3_address)?,
+        whitelisted_contracts: msg.whitelisted_contracts,
     };
 
     CONFIG.save(deps.storage, &config)?;
@@ -87,8 +90,15 @@ pub fn execute_anchor_earn_deposit(
         return Err(ContractError::UnauthorizedAction{});
     }
 
+    let anchor_market_contract = config.whitelisted_contracts.iter().find(|&x| x.label == String::from(ANCHOR_MARKET_CONTRACT));
+
+    //contract check
+    if anchor_market_contract.is_none(){
+        return Err(ContractError::ContractNotWhitelisted{});
+    }
+
     let earn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: String::from("terra1sepfj7s0aeg5967uxnfk4thzlerrsktkpelm5s"),
+        contract_addr: anchor_market_contract.unwrap().address.clone(),
         funds: vec![Coin{
             denom: String::from("uusd"),
             amount: amount,
@@ -121,8 +131,15 @@ pub fn execute_bluna_claim_rewards(
         return Err(ContractError::UnauthorizedAction{});
     }
 
+    let bluna_reward_contract = config.whitelisted_contracts.iter().find(|&x| x.label == String::from(BLUNA_REWARD_CONTRACT));
+
+    //contract check
+    if bluna_reward_contract.is_none(){
+        return Err(ContractError::ContractNotWhitelisted{});
+    }
+
     let claim_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: String::from("terra17yap3mhph35pcwvhza38c2lkj7gzywzy05h7l0"),
+        contract_addr: bluna_reward_contract.unwrap().address.clone(),
         funds: vec![],
         msg: to_binary(&ClaimRewards{recipient: None})?,
     });
@@ -304,6 +321,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         hot_wallets: config.hot_wallets,
         cw3_address: config.cw3_address,
+        whitelisted_contracts: config.whitelisted_contracts,
     })
   }
   
