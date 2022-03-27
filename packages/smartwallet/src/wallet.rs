@@ -25,6 +25,9 @@ pub enum ExecuteMsg {
     RemoveHot {address: String},
     UpsertHot {hot_wallet: HotWallet},
 
+    //whitelisted contract mgmt
+    ReplaceContractWhitelist { whitelisted_contracts: Vec<WhitelistedContract> },
+
     //update multsig
     ReplaceMultisig {address: String},
 

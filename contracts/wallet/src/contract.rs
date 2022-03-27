@@ -6,7 +6,7 @@ use cosmwasm_std::{
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract
 };
 
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
@@ -58,6 +58,8 @@ pub fn execute(
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, env, info, address),
         ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, env, info, hot_wallet),
 
+        ExecuteMsg::ReplaceContractWhitelist { whitelisted_contracts } => execute_replace_contracts(deps, env, info, whitelisted_contracts),
+
         //update multsig
         ExecuteMsg::ReplaceMultisig {address} => execute_replace_multisig(deps, env, info, address),
 
@@ -65,7 +67,6 @@ pub fn execute(
         ExecuteMsg::Execute {command} => execute_command(deps, env, info, command),
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute_anchor_earn_deposit(
@@ -263,6 +264,28 @@ pub fn execute_upsert_hot(
     CONFIG.save(deps.storage, &config);
 
     Ok(Response::new().add_attributes(vec![("action", "upsert_hot")]))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_replace_contracts(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    whitelisted_contracts: Vec<WhitelistedContract>,
+) -> Result<Response, ContractError> {
+
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    //multisig check
+    if info.sender.to_string() != config.cw3_address{
+        return Err(ContractError::Unauthorized{});
+    }
+
+    config.whitelisted_contracts = whitelisted_contracts;
+
+    CONFIG.save(deps.storage, &config);
+
+    Ok(Response::new().add_attributes(vec![("action", "replace_contracts")]))
 }
 
 #[allow(clippy::too_many_arguments)]
