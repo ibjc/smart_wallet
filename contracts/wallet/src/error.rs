@@ -27,4 +27,6 @@ pub enum ContractError {
   #[error("must whitelist contract")]
   ContractNotWhitelisted {},
 
+  #[error("gas tank is full")]
+  GasTankFull{},
 }

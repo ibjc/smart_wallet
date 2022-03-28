@@ -20,3 +20,9 @@ pub struct HotWalletState {
     pub address: String,
     pub last_gas_fillup: u64,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct HotWalletActionState {
+    pub action_id: u64,
+    pub last_execution: u64,
+}

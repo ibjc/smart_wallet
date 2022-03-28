@@ -19,8 +19,8 @@ use crate::error::ContractError;
 pub const GAS_BUFFER: u64 = 100000000u64;
 pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
 pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
-pub const ANCHOR_EARN_DEPOSIT_ID: u64: 0u64;
-pub const BLUNA_CLAIM_ID: u64: 1u64;
+pub const ANCHOR_EARN_DEPOSIT_ID: u64 = 0u64;
+pub const BLUNA_CLAIM_ID: u64 = 1u64;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -53,12 +53,12 @@ pub fn execute(
         //hot wallet actions
         ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, info, amount), //id=0
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
+        ExecuteMsg::FreeWilly{} => execute_free_willy_strat(deps, info), //id=2
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
 
-        //hot wallet mgmt; consider making a vector later on with a label field
+        //hot wallet mgmt
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),
         ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, info, hot_wallet),
-
         ExecuteMsg::ReplaceContractWhitelist { whitelisted_contracts } => execute_replace_contracts(deps, info, whitelisted_contracts),
 
         //update multsig
@@ -97,17 +97,14 @@ pub fn execute_anchor_earn_deposit(
         return Err(ContractError::ContractNotWhitelisted{});
     }
 
-    //figure out send amount, net gas buffer
-    let gas_adjusted_amount = min(
-        max(
-            Uint128::zero(), 
-            query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap() - Uint128::from(GAS_BUFFER)
-        ),
-        amount.into());
-
-    if gas_adjusted_amount <= Uint128::zero(){
+    if query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap() < Uint128::from(GAS_BUFFER){
         return Err(ContractError::SmartWalletGas{});
     }
+
+    //figure out send amount, net gas buffer
+    let gas_adjusted_amount = min(
+        query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap() - Uint128::from(GAS_BUFFER),
+        amount.into());
 
     let earn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: anchor_market_contract.unwrap().address.clone(),
@@ -190,7 +187,11 @@ pub fn execute_fill_up_gas(
     //figure out how much gas needed to fill hot wallet's tank
     let hot_wallet_gas_level = query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap();
 
-    let hot_wallet_gas_need = max(Uint128::zero(), hot_wallet_config.unwrap().gas_tank_max - hot_wallet_gas_level);
+    if hot_wallet_config.unwrap().gas_tank_max <= hot_wallet_gas_level {
+        return Err(ContractError::GasTankFull{});
+    }
+
+    let hot_wallet_gas_need = hot_wallet_config.unwrap().gas_tank_max - hot_wallet_gas_level;
 
     //sufficient smart_wallet uusd check
     if query_balance(deps.as_ref(), env.contract.address.to_string(), String::from("uusd")).unwrap() < hot_wallet_gas_need + Uint128::from(GAS_BUFFER) {
