@@ -19,6 +19,8 @@ use crate::error::ContractError;
 pub const GAS_BUFFER: u64 = 100000000u64;
 pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
 pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
+pub const ANCHOR_EARN_DEPOSIT_ID: u64: 0u64;
+pub const BLUNA_CLAIM_ID: u64: 1u64;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -75,7 +77,6 @@ pub fn execute_anchor_earn_deposit(
 ) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
-    let id = 0u64;
 
     let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
 
@@ -85,7 +86,7 @@ pub fn execute_anchor_earn_deposit(
     }
 
     //hot wallet is enabled for this action
-    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == id).is_none(){
+    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == ANCHOR_EARN_DEPOSIT_ID).is_none(){
         return Err(ContractError::UnauthorizedAction{});
     }
 
@@ -127,7 +128,6 @@ pub fn execute_bluna_claim_rewards(
 ) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
-    let id = 1u64;
 
     let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
 
@@ -137,7 +137,7 @@ pub fn execute_bluna_claim_rewards(
     }
 
     //hot wallet is enabled for this action
-    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == id).is_none(){
+    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == BLUNA_CLAIM_ID).is_none(){
         return Err(ContractError::UnauthorizedAction{});
     }
 
