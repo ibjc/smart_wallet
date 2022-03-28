@@ -21,6 +21,7 @@ pub struct HotWalletState {
     pub last_gas_fillup: u64,
 }
 
+// unused
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct HotWalletActionState {
     pub action_id: u64,

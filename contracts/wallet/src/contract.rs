@@ -53,7 +53,6 @@ pub fn execute(
         //hot wallet actions
         ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, info, amount), //id=0
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
-        ExecuteMsg::FreeWilly{} => execute_free_willy_strat(deps, info), //id=2
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
 
         //hot wallet mgmt
