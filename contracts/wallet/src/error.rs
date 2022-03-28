@@ -24,4 +24,9 @@ pub enum ContractError {
   #[error("hot address does not exist")]
   InvalidHotAddress {},
 
+  #[error("must whitelist contract")]
+  ContractNotWhitelisted {},
+
+  #[error("gas tank is full")]
+  GasTankFull{},
 }

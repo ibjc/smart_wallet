@@ -1,14 +1,13 @@
-use cosmwasm_std::{Binary, Decimal, Uint128, Addr, CosmosMsg, Empty};
-use cw20::Cw20ReceiveMsg;
+use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// ideally later we can also fabricate the cw3 during init
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub hot_wallets: Vec<HotWallet>,
     pub cw3_address: String,
+    pub whitelisted_contracts: Vec<WhitelistedContract>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -23,6 +22,9 @@ pub enum ExecuteMsg {
     //hot wallet mgmt; consider making a vector later on with a label field
     RemoveHot {address: String},
     UpsertHot {hot_wallet: HotWallet},
+
+    //whitelisted contract mgmt
+    ReplaceContractWhitelist { whitelisted_contracts: Vec<WhitelistedContract> },
 
     //update multsig
     ReplaceMultisig {address: String},
@@ -47,10 +49,18 @@ pub struct HotWallet {
     pub whitelisted_messages: Vec<u64>, //cooldown for these too?
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct WhitelistedContract {
+    pub address: String,
+    pub label: String,
+    pub code_id: u64, //this may be overkill
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub hot_wallets: Vec<HotWallet>,
     pub cw3_address: Addr,
+    pub whitelisted_contracts: Vec<WhitelistedContract>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -58,4 +68,3 @@ pub struct HotWalletStateResponse {
     pub address: String,
     pub gas_time_left: u64,
 }
-

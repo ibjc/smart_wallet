@@ -1,35 +1,39 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    from_binary, to_binary, attr, Binary, Decimal, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, Uint128, Addr, CanonicalAddr, BankMsg, WasmMsg, CosmosMsg, Coin
+    to_binary, Binary, Deps, DepsMut, Env,
+    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract
 };
 
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
-use terra_cosmwasm::TerraMsgWrapper;
-use std::cmp::{max, min};
+use std::cmp::{min, max};
 use crate::tax_querier::{query_balance, deduct_tax};
 use moneymarket::market::ExecuteMsg::DepositStable;
 use basset::reward::ExecuteMsg::ClaimRewards;
 use crate::error::ContractError;
 
 pub const GAS_BUFFER: u64 = 100000000u64;
+pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
+pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
+pub const ANCHOR_EARN_DEPOSIT_ID: u64 = 0u64;
+pub const BLUNA_CLAIM_ID: u64 = 1u64;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    info: MessageInfo,
+    _info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
 
     let config = Config {
         hot_wallets: msg.hot_wallets,
         cw3_address: deps.api.addr_validate(&msg.cw3_address)?,
+        whitelisted_contracts: msg.whitelisted_contracts,
     };
 
     CONFIG.save(deps.storage, &config)?;
@@ -47,33 +51,31 @@ pub fn execute(
     match msg {
 
         //hot wallet actions
-        ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, env, info, amount), //id=0
-        ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, env, info), //id=1
+        ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, info, amount), //id=0
+        ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
 
-        //hot wallet mgmt; consider making a vector later on with a label field
-        ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, env, info, address),
-        ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, env, info, hot_wallet),
+        //hot wallet mgmt
+        ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),
+        ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, info, hot_wallet),
+        ExecuteMsg::ReplaceContractWhitelist { whitelisted_contracts } => execute_replace_contracts(deps, info, whitelisted_contracts),
 
         //update multsig
-        ExecuteMsg::ReplaceMultisig {address} => execute_replace_multisig(deps, env, info, address),
+        ExecuteMsg::ReplaceMultisig {address} => execute_replace_multisig(deps, info, address),
 
         //generalized exec for multisig
-        ExecuteMsg::Execute {command} => execute_command(deps, env, info, command),
+        ExecuteMsg::Execute {command} => execute_command(deps, info, command),
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute_anchor_earn_deposit(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     amount: Uint128,
 ) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
-    let id = 0u64;
 
     let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
 
@@ -83,15 +85,31 @@ pub fn execute_anchor_earn_deposit(
     }
 
     //hot wallet is enabled for this action
-    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == id).is_none(){
+    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == ANCHOR_EARN_DEPOSIT_ID).is_none(){
         return Err(ContractError::UnauthorizedAction{});
     }
 
+    let anchor_market_contract = config.whitelisted_contracts.iter().find(|&x| x.label == String::from(ANCHOR_MARKET_CONTRACT));
+
+    //contract check
+    if anchor_market_contract.is_none(){
+        return Err(ContractError::ContractNotWhitelisted{});
+    }
+
+    if query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap() < Uint128::from(GAS_BUFFER){
+        return Err(ContractError::SmartWalletGas{});
+    }
+
+    //figure out send amount, net gas buffer
+    let gas_adjusted_amount = min(
+        query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap() - Uint128::from(GAS_BUFFER),
+        amount.into());
+
     let earn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: String::from("terra1sepfj7s0aeg5967uxnfk4thzlerrsktkpelm5s"),
+        contract_addr: anchor_market_contract.unwrap().address.clone(),
         funds: vec![Coin{
             denom: String::from("uusd"),
-            amount: amount,
+            amount: gas_adjusted_amount,
         }],
         msg: to_binary(&DepositStable{})?,
     });
@@ -102,12 +120,10 @@ pub fn execute_anchor_earn_deposit(
 #[allow(clippy::too_many_arguments)]
 pub fn execute_bluna_claim_rewards(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
 ) -> Result<Response, ContractError> {
 
     let config: Config = CONFIG.load(deps.storage)?;
-    let id = 1u64;
 
     let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
 
@@ -117,12 +133,19 @@ pub fn execute_bluna_claim_rewards(
     }
 
     //hot wallet is enabled for this action
-    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == id).is_none(){
+    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == BLUNA_CLAIM_ID).is_none(){
         return Err(ContractError::UnauthorizedAction{});
     }
 
+    let bluna_reward_contract = config.whitelisted_contracts.iter().find(|&x| x.label == String::from(BLUNA_REWARD_CONTRACT));
+
+    //contract check
+    if bluna_reward_contract.is_none(){
+        return Err(ContractError::ContractNotWhitelisted{});
+    }
+
     let claim_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: String::from("terra17yap3mhph35pcwvhza38c2lkj7gzywzy05h7l0"),
+        contract_addr: bluna_reward_contract.unwrap().address.clone(),
         funds: vec![],
         msg: to_binary(&ClaimRewards{recipient: None})?,
     });
@@ -140,7 +163,7 @@ pub fn execute_fill_up_gas(
 
     let config: Config = CONFIG.load(deps.storage)?;
 
-    let mut hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
+    let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
 
     //hot wallet check
     if hot_wallet_config.is_none(){
@@ -163,7 +186,11 @@ pub fn execute_fill_up_gas(
     //figure out how much gas needed to fill hot wallet's tank
     let hot_wallet_gas_level = query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap();
 
-    let hot_wallet_gas_need = max(Uint128::zero(), hot_wallet_config.unwrap().gas_tank_max - hot_wallet_gas_level);
+    if hot_wallet_config.unwrap().gas_tank_max <= hot_wallet_gas_level {
+        return Err(ContractError::GasTankFull{});
+    }
+
+    let hot_wallet_gas_need = hot_wallet_config.unwrap().gas_tank_max - hot_wallet_gas_level;
 
     //sufficient smart_wallet uusd check
     if query_balance(deps.as_ref(), env.contract.address.to_string(), String::from("uusd")).unwrap() < hot_wallet_gas_need + Uint128::from(GAS_BUFFER) {
@@ -183,7 +210,7 @@ pub fn execute_fill_up_gas(
 
     hot_wallet_state.last_gas_fillup = env.block.time.seconds();
 
-    HOT_WALLETS.save(deps.storage, info.sender.to_string(), &hot_wallet_state);
+    HOT_WALLETS.save(deps.storage, info.sender.to_string(), &hot_wallet_state)?;
 
     Ok(Response::new().add_attributes(vec![("action", "fill_up_gas")]).add_message(bank_msg))
 }
@@ -191,7 +218,6 @@ pub fn execute_fill_up_gas(
 #[allow(clippy::too_many_arguments)]
 pub fn execute_remove_hot(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     address: String,
 ) -> Result<Response, ContractError> {
@@ -216,7 +242,7 @@ pub fn execute_remove_hot(
     //remove from config
     config.hot_wallets.retain(|x| x.address != address);
 
-    CONFIG.save(deps.storage, &config);
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new().add_attributes(vec![("action", "remove_hot")]))
 }
@@ -224,7 +250,6 @@ pub fn execute_remove_hot(
 #[allow(clippy::too_many_arguments)]
 pub fn execute_upsert_hot(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     hot_wallet: HotWallet,
 ) -> Result<Response, ContractError> {
@@ -243,15 +268,35 @@ pub fn execute_upsert_hot(
     config.hot_wallets.retain(|x| x.address != address);
     config.hot_wallets.push(hot_wallet);
 
-    CONFIG.save(deps.storage, &config);
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new().add_attributes(vec![("action", "upsert_hot")]))
 }
 
 #[allow(clippy::too_many_arguments)]
+pub fn execute_replace_contracts(
+    deps: DepsMut,
+    info: MessageInfo,
+    whitelisted_contracts: Vec<WhitelistedContract>,
+) -> Result<Response, ContractError> {
+
+    let mut config: Config = CONFIG.load(deps.storage)?;
+
+    //multisig check
+    if info.sender.to_string() != config.cw3_address{
+        return Err(ContractError::Unauthorized{});
+    }
+
+    config.whitelisted_contracts = whitelisted_contracts;
+
+    CONFIG.save(deps.storage, &config)?;
+
+    Ok(Response::new().add_attributes(vec![("action", "replace_contracts")]))
+}
+
+#[allow(clippy::too_many_arguments)]
 pub fn execute_replace_multisig(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     address: String,
 ) -> Result<Response, ContractError> {
@@ -265,7 +310,7 @@ pub fn execute_replace_multisig(
 
     config.cw3_address = deps.api.addr_validate(&address)?;
 
-    CONFIG.save(deps.storage, &config);
+    CONFIG.save(deps.storage, &config)?;
 
     Ok(Response::new().add_attributes(vec![("action", "replace_multisig")]))
 }
@@ -273,12 +318,11 @@ pub fn execute_replace_multisig(
 #[allow(clippy::too_many_arguments)]
 pub fn execute_command(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
     command: CosmosMsg,
 ) -> Result<Response, ContractError> {
 
-    let mut config: Config = CONFIG.load(deps.storage)?;
+    let config: Config = CONFIG.load(deps.storage)?;
 
     //multisig check
     if info.sender.to_string() != config.cw3_address{
@@ -304,6 +348,7 @@ pub fn query_config(deps: Deps) -> StdResult<ConfigResponse> {
     Ok(ConfigResponse {
         hot_wallets: config.hot_wallets,
         cw3_address: config.cw3_address,
+        whitelisted_contracts: config.whitelisted_contracts,
     })
   }
   
