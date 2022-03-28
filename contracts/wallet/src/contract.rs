@@ -10,7 +10,7 @@ use smartwallet::wallet::{
 };
 
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
-use std::cmp::max;
+use std::cmp::{min, max};
 use crate::tax_querier::{query_balance, deduct_tax};
 use moneymarket::market::ExecuteMsg::DepositStable;
 use basset::reward::ExecuteMsg::ClaimRewards;
@@ -96,11 +96,23 @@ pub fn execute_anchor_earn_deposit(
         return Err(ContractError::ContractNotWhitelisted{});
     }
 
+    //figure out send amount, net gas buffer
+    let gas_adjusted_amount = min(
+        max(
+            Uint128::zero(), 
+            query_balance(deps.as_ref(), info.sender.to_string(), String::from("uusd")).unwrap() - Uint128::from(GAS_BUFFER)
+        ),
+        amount.into());
+
+    if gas_adjusted_amount <= Uint128::zero(){
+        return Err(ContractError::SmartWalletGas{});
+    }
+
     let earn_msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: anchor_market_contract.unwrap().address.clone(),
         funds: vec![Coin{
             denom: String::from("uusd"),
-            amount: amount,
+            amount: gas_adjusted_amount,
         }],
         msg: to_binary(&DepositStable{})?,
     });
