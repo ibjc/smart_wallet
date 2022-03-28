@@ -1,8 +1,8 @@
-use cosmwasm_std::{CanonicalAddr, Decimal, StdResult, Storage, Uint128, Addr, Deps, Api, Order, Binary};
+use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cw_storage_plus::{Map, Item, Bound};
+use cw_storage_plus::{Map, Item};
 use smartwallet::wallet::{HotWallet, WhitelistedContract};
 
 pub const HOT_WALLETS: Map<String, HotWalletState> = Map::new("hotwallets");

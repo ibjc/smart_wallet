@@ -1,8 +1,6 @@
-use cosmwasm_std::{Binary, Decimal, Uint128, Addr, CosmosMsg, Empty};
-use cw20::Cw20ReceiveMsg;
+use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// ideally later we can also fabricate the cw3 during init
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
