@@ -2,13 +2,14 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin
+    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, CosmosMsg, Coin, WasmMsg, Reply, StdError
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, WhitelistedMessage
 };
-
+use protobuf::Message;
+use crate::response::MsgInstantiateContractResponse;
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
 use std::cmp::{min, max};
 use crate::tax_querier::{query_balance, deduct_tax};
@@ -21,6 +22,7 @@ pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
 pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
 pub const ANCHOR_EARN_DEPOSIT_ID: u64 = 0u64;
 pub const BLUNA_CLAIM_ID: u64 = 1u64;
+pub const INIT_REPLY_ID: u64 = 1u64;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -53,12 +55,19 @@ pub fn execute(
         //hot wallet actions
         ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, info, amount), //id=0
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
+        
+        //generalized execute checked against whitelist
+        ExecuteMsg::ExecuteHot{command} => execute_hot_command(deps, env, info, command),
+
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
 
         //hot wallet mgmt
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),
         ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, info, hot_wallet),
         ExecuteMsg::ReplaceContractWhitelist { whitelisted_contracts } => execute_replace_contracts(deps, info, whitelisted_contracts),
+        ExecuteMsg::RemoveMsg {id} => execute_remove_msg(deps, env, info, id),
+        ExecuteMsg::UpsertMsg {whitelisted_message} => execute_upsert_msg(deps, env, info, whitelisted_message),
+
 
         //update multsig
         ExecuteMsg::ReplaceMultisig {address} => execute_replace_multisig(deps, info, address),
@@ -66,6 +75,61 @@ pub fn execute(
         //generalized exec for multisig
         ExecuteMsg::Execute {command} => execute_command(deps, info, command),
     }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
+    match msg.id {
+        INIT_REPLY_ID => {
+            // get new token's contract address
+            let res: MsgInstantiateContractResponse = Message::parse_from_bytes(
+                msg.result.unwrap().data.unwrap().as_slice(),
+            )
+            .map_err(|_| {
+                ContractError::Std(StdError::parse_err(
+                    "MsgInstantiateContractResponse",
+                    "failed to parse data",
+                ))
+            })?;
+            let token_addr = Addr::unchecked(res.get_contract_address());
+
+            Ok(Response::new())
+
+            //update config with spawned cw3 address
+        }
+        _ => Err(ContractError::InvalidReplyId {})
+    }
+}
+
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_hot_command(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    command: WasmMsg,
+) -> Result<Response, ContractError> {
+    return Err(ContractError::Unauthorized{});
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_remove_msg(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    id: u64,
+) -> Result<Response, ContractError> {
+    return Err(ContractError::Unauthorized{});
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_upsert_msg(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    whitelisted_message: WhitelistedMessage,
+) -> Result<Response, ContractError> {
+    return Err(ContractError::Unauthorized{});
 }
 
 #[allow(clippy::too_many_arguments)]

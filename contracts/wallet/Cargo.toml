@@ -51,6 +51,7 @@ cw20-base = { version = "0.8", features = ["library"] }
 moneymarket = "0.3.0"
 basset = { path = "../../packages/basset", default-features = false, version = "0.1.0"}
 cw3-fixed-multisig = "0.10.0"
+protobuf = { version = "2", features = ["with-bytes"] }
 
 [dev-dependencies]
 cosmwasm-schema = "0.16.0"

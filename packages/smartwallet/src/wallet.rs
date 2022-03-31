@@ -1,4 +1,4 @@
-use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty};
+use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty, Coin, WasmMsg};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -19,12 +19,18 @@ pub enum ExecuteMsg {
     BlunaClaim {}, //id=1
     FillUpGas {}, // no id check
 
+    ExecuteHot{command: WasmMsg},
+
     //hot wallet mgmt; consider making a vector later on with a label field
     RemoveHot {address: String},
     UpsertHot {hot_wallet: HotWallet},
 
     //whitelisted contract mgmt
     ReplaceContractWhitelist { whitelisted_contracts: Vec<WhitelistedContract> },
+
+    //whitelisted messages
+    RemoveMsg {id: u64},
+    UpsertMsg {whitelisted_message: WhitelistedMessage},
 
     //update multsig
     ReplaceMultisig {address: String},
@@ -56,6 +62,14 @@ pub struct WhitelistedContract {
     pub code_id: u64, //this may be overkill
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct WhitelistedMessage {
+    pub id: u64,
+    pub contract_address: String,
+    pub funds: Vec<Coin>,
+    pub msg: CosmosMsg<WasmMsg>,
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema)]
 pub struct ConfigResponse {
     pub hot_wallets: Vec<HotWallet>,
@@ -68,3 +82,4 @@ pub struct HotWalletStateResponse {
     pub address: String,
     pub gas_time_left: u64,
 }
+
