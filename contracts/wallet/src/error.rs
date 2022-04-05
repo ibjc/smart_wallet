@@ -32,4 +32,10 @@ pub enum ContractError {
 
   #[error("reply id not implemented")]
   InvalidReplyId,
+
+  #[error("unauthorized message for hot wallet")]
+  UnauthorizedHotMessage,
+
+  #[error("unauthorized message for hot wallet")]
+  UnauthorizedHotMessage,
 }

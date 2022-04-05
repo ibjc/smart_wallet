@@ -1,7 +1,7 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Binary, Deps, DepsMut, Env,
+    to_binary, from_binary, Binary, Deps, DepsMut, Env,
     MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, CosmosMsg, Coin, WasmMsg, Reply, StdError
 };
 
@@ -109,6 +109,34 @@ pub fn execute_hot_command(
     info: MessageInfo,
     command: WasmMsg,
 ) -> Result<Response, ContractError> {
+
+    match command {
+        WasmMsg::Execute {contract_addr, funds, msg} => execute_hot_msg(deps, env, info, contract_addr, funds, msg),
+        _ => Err(ContractError::InvalidReplyId {})
+    };
+
+    return Err(ContractError::Unauthorized{});
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_hot_msg(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    contract_addr: String,
+    funds: Vec<Coin>,
+    msg: Binary,
+) -> Result<Response, ContractError> {
+
+    //ideal logic is if the message is in the whitelist, execute
+    //else send unauthorized/error message
+
+    match from_binary(&msg) {
+        Ok(moneymarket::market::ExecuteMsg::DepositStable{}) => execute_remove_msg(deps, env, info, 0u64),
+        Err(err) => Err(ContractError::UnauthorizedHotMessage),
+        _ => Err(ContractError::UnauthorizedHotMessage),
+    };
+
     return Err(ContractError::Unauthorized{});
 }
 
