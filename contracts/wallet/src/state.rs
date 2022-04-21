@@ -2,7 +2,7 @@ use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cw_storage_plus::{Map, Item};
+use cw_storage_plus::{Item, Map};
 use smartwallet::wallet::{HotWallet, WhitelistedContract};
 
 pub const HOT_WALLETS: Map<String, HotWalletState> = Map::new("hotwallets");

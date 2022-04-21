@@ -5,28 +5,27 @@ use thiserror::Error;
 /// have no idea how to convert a cosmosmsg<empty> to a terramsgwrapper
 #[derive(Error, Debug, PartialEq)]
 pub enum ContractError {
-  #[error("{0}")]
-  Std(#[from] StdError),
+    #[error("{0}")]
+    Std(#[from] StdError),
 
+    #[error("unauthorized")]
+    Unauthorized {},
 
-  #[error("unauthorized")]
-  Unauthorized {},
+    #[error("unauthorized action")]
+    UnauthorizedAction {},
 
-  #[error("unauthorized action")]
-  UnauthorizedAction {},
+    #[error("gas cooldown not done")]
+    GasCooldown {},
 
-  #[error("gas cooldown not done")]
-  GasCooldown {},
+    #[error("smart_wallet insufficient gas")]
+    SmartWalletGas {},
 
-  #[error("smart_wallet insufficient gas")]
-  SmartWalletGas {},
+    #[error("hot address does not exist")]
+    InvalidHotAddress {},
 
-  #[error("hot address does not exist")]
-  InvalidHotAddress {},
+    #[error("must whitelist contract")]
+    ContractNotWhitelisted {},
 
-  #[error("must whitelist contract")]
-  ContractNotWhitelisted {},
-
-  #[error("gas tank is full")]
-  GasTankFull{},
+    #[error("gas tank is full")]
+    GasTankFull {},
 }

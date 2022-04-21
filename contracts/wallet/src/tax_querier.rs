@@ -1,8 +1,9 @@
-use cosmwasm_std::{Coin, Decimal, QuerierWrapper, StdResult, Uint128, Deps, BalanceResponse, QueryRequest, BankQuery};
+use cosmwasm_std::{
+    BalanceResponse, BankQuery, Coin, Decimal, Deps, QuerierWrapper, QueryRequest, StdResult,
+    Uint128,
+};
 
 use terra_cosmwasm::TerraQuerier;
-
-
 
 static DECIMAL_FRACTION: Uint128 = Uint128::new(1_000_000_000_000_000_000u128);
 

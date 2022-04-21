@@ -1,4 +1,4 @@
-use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty};
+use cosmwasm_std::{Addr, CosmosMsg, Empty, Uint128};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -13,31 +13,42 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    
     //hardwired hot msgs with internal u64 ids
-    AnchorEarnDeposit {amount: Uint128}, // id=0
+    AnchorEarnDeposit {
+        amount: Uint128,
+    }, // id=0
     BlunaClaim {}, //id=1
-    FillUpGas {}, // no id check
+    FillUpGas {},  // no id check
 
     //hot wallet mgmt; consider making a vector later on with a label field
-    RemoveHot {address: String},
-    UpsertHot {hot_wallet: HotWallet},
+    RemoveHot {
+        address: String,
+    },
+    UpsertHot {
+        hot_wallet: HotWallet,
+    },
 
     //whitelisted contract mgmt
-    ReplaceContractWhitelist { whitelisted_contracts: Vec<WhitelistedContract> },
+    ReplaceContractWhitelist {
+        whitelisted_contracts: Vec<WhitelistedContract>,
+    },
 
     //update multsig
-    ReplaceMultisig {address: String},
+    ReplaceMultisig {
+        address: String,
+    },
 
     //generalized exec for multisig
-    Execute {command: CosmosMsg<Empty>},
+    Execute {
+        command: CosmosMsg<Empty>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     Config {},
-    HotWallet {address: String},
+    HotWallet { address: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
