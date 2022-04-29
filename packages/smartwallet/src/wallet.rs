@@ -1,7 +1,6 @@
 use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use cw3_fixed_multisig::msg::Voter;
 
 /// ideally later we can also fabricate the cw3 during init
 /*
@@ -27,10 +26,29 @@ pub enum InstantiateMsg {
         whitelisted_contracts: Vec<WhitelistedContract>,
         max_voting_period_in_blocks: u64,
         required_weight: u64,
-        multisig_voters: Vec<Voter>,
+        multisig_voters: Vec<MultiSigVoter>,
         cw3_code_id: u64,
     },
 
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Cw3InstantiateMsg{
+    pub voters: Vec<MultiSigVoter>,
+    pub required_weight: u64,
+    pub max_voting_period: Duration,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MultiSigVoter{
+    pub addr: String,
+    pub weight: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub enum Duration{
+    Height(u64),
+    Time(u64),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

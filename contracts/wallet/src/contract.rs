@@ -2,11 +2,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError,
+    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError, 
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, 
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, Cw3InstantiateMsg, MultiSigVoter, Duration
 };
 
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
@@ -17,8 +17,6 @@ use basset::reward::ExecuteMsg::ClaimRewards;
 use crate::error::ContractError;
 use protobuf::Message;
 use crate::response::MsgInstantiateContractResponse;
-use cw3_fixed_multisig::msg::{InstantiateMsg as cw3_instantiatemsg, Voter};
-use cw0::Duration;
 
 pub const GAS_BUFFER: u64 = 100000000u64;
 pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
@@ -69,7 +67,7 @@ pub fn instantiate_spawn_multisig(
     whitelisted_contracts: Vec<WhitelistedContract>,
     max_voting_period_in_blocks: u64,
     required_weight: u64,
-    multisig_voters: Vec<Voter>,
+    multisig_voters: Vec<MultiSigVoter>,
     cw3_code_id: u64,
 ) -> Result<Response, ContractError> {
 
@@ -84,13 +82,13 @@ pub fn instantiate_spawn_multisig(
         CosmosMsg::Wasm(WasmMsg::Instantiate{
             admin: Some(info.sender.to_string()),
             code_id: cw3_code_id,
-            msg: to_binary(&cw3_instantiatemsg{
+            msg: to_binary(&Cw3InstantiateMsg{
                 voters: multisig_voters,
                 required_weight: required_weight,
                 max_voting_period: Duration::Height(max_voting_period_in_blocks),
             })?,
             funds: vec![],
-            label: String::from("trolllll"),
+            label: String::from("multisig"),
         }),
         SPAWN_MULTISIG_REPLY_ID,
     )))
