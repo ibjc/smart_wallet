@@ -1,13 +1,36 @@
 use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use cw3_fixed_multisig::msg::Voter;
 
 /// ideally later we can also fabricate the cw3 during init
+/*
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub hot_wallets: Vec<HotWallet>,
     pub cw3_address: String,
     pub whitelisted_contracts: Vec<WhitelistedContract>,
+}
+*/
+
+/// ideally later we can also fabricate the cw3 during init
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub enum InstantiateMsg {
+    
+    ExistingMultiSig {
+        hot_wallets: Vec<HotWallet>,
+        cw3_address: String,
+        whitelisted_contracts: Vec<WhitelistedContract>,
+    },
+    SpawnMultiSig{
+        hot_wallets: Vec<HotWallet>,
+        whitelisted_contracts: Vec<WhitelistedContract>,
+        max_voting_period_in_blocks: u64,
+        required_weight: u64,
+        multisig_voters: Vec<Voter>,
+        cw3_code_id: u64,
+    },
+
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
