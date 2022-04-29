@@ -47,6 +47,7 @@ pub struct MultiSigVoter{
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Duration{
     Height(u64),
     Time(u64),
