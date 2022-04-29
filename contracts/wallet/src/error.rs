@@ -29,4 +29,8 @@ pub enum ContractError {
 
   #[error("gas tank is full")]
   GasTankFull{},
+
+  #[error("reply id not implemented")]
+  InvalidReplyId,
+
 }
