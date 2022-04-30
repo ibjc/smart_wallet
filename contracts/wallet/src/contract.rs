@@ -1,12 +1,12 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, from_binary, Binary, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, CosmosMsg, Coin, WasmMsg, Reply, StdError
+    to_binary, Binary, Deps, DepsMut, Env,
+    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, WhitelistedMessage
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, Cw3InstantiateMsg, MultiSigVoter, Duration
 };
 use protobuf::Message;
 use crate::response::MsgInstantiateContractResponse;
@@ -24,23 +24,94 @@ pub const ANCHOR_EARN_DEPOSIT_ID: u64 = 0u64;
 pub const BLUNA_CLAIM_ID: u64 = 1u64;
 pub const INIT_REPLY_ID: u64 = 1u64;
 
+pub const SPAWN_MULTISIG_REPLY_ID: u64 = 100u64;
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
-    _info: MessageInfo,
+    info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
 
+    match msg{
+        InstantiateMsg::ExistingMultiSig {hot_wallets, cw3_address, whitelisted_contracts} => instantiate_existing_multisig(deps, hot_wallets, cw3_address, whitelisted_contracts),
+        InstantiateMsg::SpawnMultiSig{hot_wallets, whitelisted_contracts, max_voting_period_in_blocks, required_weight, multisig_voters, cw3_code_id} => instantiate_spawn_multisig(deps, info, hot_wallets, whitelisted_contracts, max_voting_period_in_blocks, required_weight, multisig_voters, cw3_code_id),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn instantiate_existing_multisig(
+    deps: DepsMut,
+    hot_wallets: Vec<HotWallet>,
+    cw3_address: String,
+    whitelisted_contracts: Vec<WhitelistedContract>,
+) -> Result<Response, ContractError> {
+
     let config = Config {
-        hot_wallets: msg.hot_wallets,
-        cw3_address: deps.api.addr_validate(&msg.cw3_address)?,
-        whitelisted_contracts: msg.whitelisted_contracts,
+        hot_wallets: hot_wallets,
+        cw3_address: deps.api.addr_validate(&cw3_address)?,
+        whitelisted_contracts: whitelisted_contracts,
     };
 
     CONFIG.save(deps.storage, &config)?;
 
-    Ok(Response::default())
+    Ok(Response::new().add_attributes(vec![("action", "init_existing_multisig")]))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn instantiate_spawn_multisig(
+    deps: DepsMut,
+    info: MessageInfo,
+    hot_wallets: Vec<HotWallet>,
+    whitelisted_contracts: Vec<WhitelistedContract>,
+    max_voting_period_in_blocks: u64,
+    required_weight: u64,
+    multisig_voters: Vec<MultiSigVoter>,
+    cw3_code_id: u64,
+) -> Result<Response, ContractError> {
+
+    CONFIG.save(deps.storage, &Config{
+        hot_wallets: hot_wallets, 
+        cw3_address: Addr::unchecked(""), 
+        whitelisted_contracts: whitelisted_contracts,
+    })?;
+
+    Ok(Response::default()
+    .add_submessage(SubMsg::reply_on_success(
+        CosmosMsg::Wasm(WasmMsg::Instantiate{
+            admin: Some(info.sender.to_string()),
+            code_id: cw3_code_id,
+            msg: to_binary(&Cw3InstantiateMsg{
+                voters: multisig_voters,
+                required_weight: required_weight,
+                max_voting_period: Duration::Height(max_voting_period_in_blocks),
+            })?,
+            funds: vec![],
+            label: String::from("multisig"),
+        }),
+        SPAWN_MULTISIG_REPLY_ID,
+    )))
+}
+
+#[entry_point]
+pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
+    match reply.id{
+        SPAWN_MULTISIG_REPLY_ID => {
+
+            let data = reply.result.unwrap().data.unwrap();
+            let res: MsgInstantiateContractResponse = Message::parse_from_bytes(data.as_slice()).map_err(|_| {
+                StdError::parse_err("MsgInstantiateContractResponse", "failed to parse data")
+            })?;
+            
+            let mut config: Config = CONFIG.load(deps.storage)?;
+            config.cw3_address = deps.api.addr_validate(res.get_contract_address())?;
+            CONFIG.save(deps.storage, &config)?;
+
+            Ok(Response::new())
+        },
+        _ => Err(ContractError::InvalidReplyId{})
+    }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -55,18 +126,12 @@ pub fn execute(
         //hot wallet actions
         ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, info, amount), //id=0
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
-        
-        //generalized execute checked against whitelist
-        ExecuteMsg::ExecuteHot{command} => execute_hot_command(deps, env, info, command),
-
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
 
         //hot wallet mgmt
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),
         ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, info, hot_wallet),
         ExecuteMsg::ReplaceContractWhitelist { whitelisted_contracts } => execute_replace_contracts(deps, info, whitelisted_contracts),
-        ExecuteMsg::RemoveMsg {id} => execute_remove_msg(deps, env, info, id),
-        ExecuteMsg::UpsertMsg {whitelisted_message} => execute_upsert_msg(deps, env, info, whitelisted_message),
 
 
         //update multsig
@@ -77,88 +142,6 @@ pub fn execute(
     }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
-    match msg.id {
-        INIT_REPLY_ID => {
-            // get new token's contract address
-            let res: MsgInstantiateContractResponse = Message::parse_from_bytes(
-                msg.result.unwrap().data.unwrap().as_slice(),
-            )
-            .map_err(|_| {
-                ContractError::Std(StdError::parse_err(
-                    "MsgInstantiateContractResponse",
-                    "failed to parse data",
-                ))
-            })?;
-            let token_addr = Addr::unchecked(res.get_contract_address());
-
-            Ok(Response::new())
-
-            //update config with spawned cw3 address
-        }
-        _ => Err(ContractError::InvalidReplyId {})
-    }
-}
-
-
-#[allow(clippy::too_many_arguments)]
-pub fn execute_hot_command(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    command: WasmMsg,
-) -> Result<Response, ContractError> {
-
-    match command {
-        WasmMsg::Execute {contract_addr, funds, msg} => execute_hot_msg(deps, env, info, contract_addr, funds, msg),
-        _ => Err(ContractError::InvalidReplyId {})
-    };
-
-    return Err(ContractError::Unauthorized{});
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn execute_hot_msg(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    contract_addr: String,
-    funds: Vec<Coin>,
-    msg: Binary,
-) -> Result<Response, ContractError> {
-
-    //ideal logic is if the message is in the whitelist, execute
-    //else send unauthorized/error message
-
-    match from_binary(&msg) {
-        Ok(moneymarket::market::ExecuteMsg::DepositStable{}) => execute_remove_msg(deps, env, info, 0u64),
-        Err(err) => Err(ContractError::UnauthorizedHotMessage),
-        _ => Err(ContractError::UnauthorizedHotMessage),
-    };
-
-    return Err(ContractError::Unauthorized{});
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn execute_remove_msg(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    id: u64,
-) -> Result<Response, ContractError> {
-    return Err(ContractError::Unauthorized{});
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn execute_upsert_msg(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    whitelisted_message: WhitelistedMessage,
-) -> Result<Response, ContractError> {
-    return Err(ContractError::Unauthorized{});
-}
 
 #[allow(clippy::too_many_arguments)]
 pub fn execute_anchor_earn_deposit(

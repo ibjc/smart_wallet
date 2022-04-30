@@ -3,11 +3,54 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// ideally later we can also fabricate the cw3 during init
+/*
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub hot_wallets: Vec<HotWallet>,
     pub cw3_address: String,
     pub whitelisted_contracts: Vec<WhitelistedContract>,
+}
+*/
+
+/// ideally later we can also fabricate the cw3 during init
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum InstantiateMsg {
+    
+    ExistingMultiSig {
+        hot_wallets: Vec<HotWallet>,
+        cw3_address: String,
+        whitelisted_contracts: Vec<WhitelistedContract>,
+    },
+    SpawnMultiSig{
+        hot_wallets: Vec<HotWallet>,
+        whitelisted_contracts: Vec<WhitelistedContract>,
+        max_voting_period_in_blocks: u64,
+        required_weight: u64,
+        multisig_voters: Vec<MultiSigVoter>,
+        cw3_code_id: u64,
+    },
+
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct Cw3InstantiateMsg{
+    pub voters: Vec<MultiSigVoter>,
+    pub required_weight: u64,
+    pub max_voting_period: Duration,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MultiSigVoter{
+    pub addr: String,
+    pub weight: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Duration{
+    Height(u64),
+    Time(u64),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -19,18 +62,12 @@ pub enum ExecuteMsg {
     BlunaClaim {}, //id=1
     FillUpGas {}, // no id check
 
-    ExecuteHot{command: WasmMsg},
-
     //hot wallet mgmt; consider making a vector later on with a label field
     RemoveHot {address: String},
     UpsertHot {hot_wallet: HotWallet},
 
     //whitelisted contract mgmt
     ReplaceContractWhitelist { whitelisted_contracts: Vec<WhitelistedContract> },
-
-    //whitelisted messages
-    RemoveMsg {id: u64},
-    UpsertMsg {whitelisted_message: WhitelistedMessage},
 
     //update multsig
     ReplaceMultisig {address: String},

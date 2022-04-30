@@ -35,7 +35,4 @@ pub enum ContractError {
 
   #[error("unauthorized message for hot wallet")]
   UnauthorizedHotMessage,
-
-  #[error("unauthorized message for hot wallet")]
-  UnauthorizedHotMessage,
 }

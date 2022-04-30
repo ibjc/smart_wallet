@@ -1,1 +1,1 @@
-71df5db8c2be6e3057fda129f462771155097ba7344d70adbac628dfc4366500  smartwallet_wallet.wasm
+015b28a5a1b7947faea65cb748be2b0512090d756a75d8dca54c03fef1ea2258  smartwallet_wallet.wasm
