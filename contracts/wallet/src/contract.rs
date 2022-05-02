@@ -12,7 +12,7 @@ use smartwallet::wallet::{
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
 use std::cmp::{min, max};
 use crate::tax_querier::{query_balance, deduct_tax};
-use moneymarket::market::ExecuteMsg::DepositStable;
+use moneymarket::market::ExecuteMsg::{DepositStable, RepayStable};
 use basset::reward::ExecuteMsg::ClaimRewards;
 use crate::error::ContractError;
 use protobuf::Message;
@@ -23,6 +23,7 @@ pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
 pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
 pub const ANCHOR_EARN_DEPOSIT_ID: u64 = 0u64;
 pub const BLUNA_CLAIM_ID: u64 = 1u64;
+pub const ANCHOR_REPAY_STABLE_ID: u64 = 2u64;
 
 pub const SPAWN_MULTISIG_REPLY_ID: u64 = 100u64;
 
@@ -128,6 +129,7 @@ pub fn execute(
         //hot wallet actions
         ExecuteMsg::AnchorEarnDeposit {amount} => execute_anchor_earn_deposit(deps, info, amount), //id=0
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
+        ExecuteMsg::RepayStable{amount} => execute_repay_stable(deps, info, amount), //id=2
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
 
         //hot wallet mgmt
@@ -141,6 +143,47 @@ pub fn execute(
         //generalized exec for multisig
         ExecuteMsg::Execute {command} => execute_command(deps, info, command),
     }
+}
+
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_repay_stable(
+    deps: DepsMut,
+    info: MessageInfo,
+    amount: Uint128,
+) -> Result<Response, ContractError> {
+
+    let config: Config = CONFIG.load(deps.storage)?;
+
+    let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
+
+    //hot wallet check
+    if hot_wallet_config.is_none(){
+        return Err(ContractError::Unauthorized{});
+    }
+
+    //hot wallet is enabled for this action
+    if hot_wallet_config.unwrap().whitelisted_messages.iter().find(|&&x| x == ANCHOR_REPAY_STABLE_ID).is_none(){
+        return Err(ContractError::UnauthorizedAction{});
+    }
+
+    let anchor_market_contract = config.whitelisted_contracts.iter().find(|&x| x.label == String::from(ANCHOR_MARKET_CONTRACT));
+
+    //contract check
+    if anchor_market_contract.is_none(){
+        return Err(ContractError::ContractNotWhitelisted{});
+    }
+
+    let repay_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: anchor_market_contract.unwrap().address.clone(),
+        funds: vec![Coin{
+            denom: String::from("uusd"),
+            amount: amount,
+        }],
+        msg: to_binary(&RepayStable{})?,
+    });
+
+    Ok(Response::new().add_attributes(vec![("action", "anchor_earn_deposit")]).add_message(repay_msg))
 }
 
 #[allow(clippy::too_many_arguments)]
