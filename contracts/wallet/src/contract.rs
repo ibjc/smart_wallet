@@ -128,6 +128,8 @@ pub fn execute(
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
         ExecuteMsg::RepayStable{amount} => execute_repay_stable(deps, info, amount), //id=2
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
+        
+        ExecuteMsg::ExecuteHotCommand {contract_address, command} => Ok(Response::new()), //execute whitelisted contract message
 
         //hot wallet mgmt
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),

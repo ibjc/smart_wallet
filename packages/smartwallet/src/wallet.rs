@@ -1,4 +1,4 @@
-use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty, Coin, WasmMsg};
+use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty, Coin, WasmMsg, Binary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -61,6 +61,9 @@ pub enum ExecuteMsg {
     AnchorEarnDeposit {amount: Uint128}, // id=0
     BlunaClaim {}, //id=1
     RepayStable {amount: Uint128}, //id=2
+
+    //meta hot hot msgs
+    ExecuteHotCommand {contract_address: String, command: Binary}, //execute whitelisted contract message
     FillUpGas {}, // no id check
 
     //hot wallet mgmt; consider making a vector later on with a label field
