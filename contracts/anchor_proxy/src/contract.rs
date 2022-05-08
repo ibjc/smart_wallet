@@ -51,6 +51,13 @@ pub fn execute(
     match msg {
 
         ExecuteMsg::Receive(msg) => receive_cw20(deps, info, msg),
+        ExecuteMsg::UpdateConfig{
+            owner,
+            market_contract,
+            overseer_contract,
+            liquidation_contract,
+        } => Ok(Response::new()),
+        ExecuteMsg::UpsertCustodyContract{custody_contract: CustodyContractInfo} => Ok(Response::new()),
 
         ExecuteMsg::DepositStable {} => Ok(Response::new()),
         ExecuteMsg::ClaimRewards { to } => Ok(Response::new()),

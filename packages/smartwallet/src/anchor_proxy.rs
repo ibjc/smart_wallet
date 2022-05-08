@@ -27,6 +27,13 @@ pub struct CustodyContractInfo{
 pub enum ExecuteMsg {
     
     Receive(Cw20ReceiveMsg),
+    UpdateConfig{
+        owner: Option<String>,
+        market_contract: Option<String>,
+        overseer_contract: Option<String>,
+        liquidation_contract: Option<String>,
+    },
+    UpsertCustodyContract{custody_contract: CustodyContractInfo},
 
     //market contract operations
     DepositStable {},
