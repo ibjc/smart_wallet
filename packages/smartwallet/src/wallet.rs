@@ -60,6 +60,7 @@ pub enum ExecuteMsg {
     //hardwired hot msgs with internal u64 ids
     AnchorEarnDeposit {amount: Uint128}, // id=0
     BlunaClaim {}, //id=1
+    RepayStable {amount: Uint128}, //id=2
     FillUpGas {}, // no id check
 
     //hot wallet mgmt; consider making a vector later on with a label field
