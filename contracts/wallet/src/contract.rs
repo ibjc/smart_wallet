@@ -22,11 +22,7 @@ pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
 pub const BLUNA_REWARD_CONTRACT: &str = "bluna_reward";
 pub const ANCHOR_EARN_DEPOSIT_ID: u64 = 0u64;
 pub const BLUNA_CLAIM_ID: u64 = 1u64;
-<<<<<<< HEAD
-pub const INIT_REPLY_ID: u64 = 1u64;
-=======
 pub const ANCHOR_REPAY_STABLE_ID: u64 = 2u64;
->>>>>>> master
 
 pub const SPAWN_MULTISIG_REPLY_ID: u64 = 100u64;
 
