@@ -2,17 +2,6 @@ use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty, Coin, WasmMsg, Binary};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// ideally later we can also fabricate the cw3 during init
-/*
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct InstantiateMsg {
-    pub hot_wallets: Vec<HotWallet>,
-    pub cw3_address: String,
-    pub whitelisted_contracts: Vec<WhitelistedContract>,
-}
-*/
-
-/// ideally later we can also fabricate the cw3 during init
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum InstantiateMsg {
@@ -62,11 +51,12 @@ pub enum ExecuteMsg {
     BlunaClaim {}, //id=1
     RepayStable {amount: Uint128}, //id=2
 
-    //meta hot hot msgs
-    ExecuteHotCommand {contract_address: String, command: Binary}, //execute whitelisted contract message
+    //forwarding hot msgs
+    ExecuteHotCommand {contract_address: String, funds: Vec<Coin>, command: Binary}, //execute whitelisted wasm message
     FillUpGas {}, // no id check
 
     //hot wallet mgmt; consider making a vector later on with a label field
+    //TODO: rethink hot wallet privileges setup
     RemoveHot {address: String},
     UpsertHot {hot_wallet: HotWallet},
 
