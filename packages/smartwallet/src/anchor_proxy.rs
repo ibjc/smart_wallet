@@ -1,4 +1,5 @@
-use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty, Coin, WasmMsg, Binary, Uint256,};
+use cosmwasm_std::{Uint128, Addr, CosmosMsg, Empty, Coin, WasmMsg, Binary,};
+use cosmwasm_bignumber::Uint256;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use cw20::Cw20ReceiveMsg;
@@ -37,13 +38,13 @@ pub enum ExecuteMsg {
 
     //market contract operations
     DepositStable {},
-    ClaimRewards {to: String},
+    ClaimRewards {},
 
     //overseer operations
     LiquidateCollateral {borrower: String},
 
     //overseer + custody composite
-    WithdrawCollateral{amount: Uint256}, //unlock + withdraw
+    WithdrawCollateral{collateral_token: String, amount: Option<Uint256>}, //unlock + withdraw
 
     //liquidation queue operations
     SubmitBid {collateral_token: String, premium_slot: u8 },
