@@ -146,7 +146,7 @@ pub fn deposit_collateral(
         })?,
     });
 
-    Ok(Response::new().add_attributes(vec![("action", "market_redeem_stable")]).add_messages(vec![deposit_msg, lock_msg]))
+    Ok(Response::new().add_attributes(vec![("action", "deposit_collateral")]).add_messages(vec![deposit_msg, lock_msg]))
 }
 
 pub fn redeem_stable(
@@ -182,6 +182,19 @@ pub fn execute_withdraw_collateral(
 
     let collateral_address: Addr = deps.api.addr_validate(&collateral_token)?;
 
+    if let Some(amount) = amount{
+    } else {
+        return Err(ContractError::InvalidDepositAmount{})
+    }
+
+    let unlock_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.overseer_contract.into(),
+        funds: vec![],
+        msg: to_binary(&OverseerExecuteMsg::UnlockCollateral{
+            collaterals: vec![(collateral_address.clone().into(), amount.unwrap().into())]
+        })?,
+    });
+
     let custody_contract = &config
         .custody_contracts
         .iter()
@@ -196,7 +209,9 @@ pub fn execute_withdraw_collateral(
         msg: to_binary(&CustodyExecuteMsg::WithdrawCollateral{amount: amount})?,
     });
 
-    Ok(Response::new().add_attributes(vec![("action", "overseer_liquidate_collateral")]).add_message(withdraw_msg))
+
+
+    Ok(Response::new().add_attributes(vec![("action", "withdraw_collateral")]).add_messages(vec![unlock_msg, withdraw_msg]))
 }
 
 pub fn execute_liquidate_collateral(

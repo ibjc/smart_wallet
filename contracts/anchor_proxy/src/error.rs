@@ -38,4 +38,7 @@ pub enum ContractError {
 
   #[error("reply id not implemented")]
   InvalidReceiveMsg {},
+
+  #[error("must deposit positive number of assets")]
+  InvalidDepositAmount {},
 }
