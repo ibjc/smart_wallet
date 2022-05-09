@@ -10,13 +10,13 @@ use smartwallet::anchor_proxy::{ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResp
 
 use crate::state::{CONFIG, Config, CustodyContractInfo as StateCustodyContractInfo};
 use moneymarket::{
-    market::ExecuteMsg as AnchorExecuteMsg,
+    market::{ExecuteMsg as AnchorExecuteMsg, Cw20HookMsg as AnchorHookMsg},
     overseer::ExecuteMsg as OverseerExecuteMsg,
-    custody::ExecuteMsg as CustodyExecuteMsg,
+    custody::{ExecuteMsg as CustodyExecuteMsg, Cw20HookMsg as CustodyHookMsg},
 };
 use basset::reward::{ExecuteMsg as BassetExecuteMsg};
 use crate::error::ContractError;
-use cw20::Cw20ReceiveMsg;
+use cw20::{Cw20ReceiveMsg, Cw20ExecuteMsg};
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -42,6 +42,7 @@ pub fn instantiate(
         overseer_contract: deps.api.addr_validate(&msg.overseer_contract)?,
         custody_contracts: custody_contracts,
         liquidation_contract: deps.api.addr_validate(&msg.liquidation_contract)?,
+        aust_address: deps.api.addr_validate(&msg.aust_address)?,
     })?;
     
     Ok(Response::new())
@@ -72,6 +73,7 @@ pub fn execute(
 
         ExecuteMsg::WithdrawCollateral { collateral_token, amount } => execute_withdraw_collateral(deps, env, info, collateral_token, amount),
 
+        //liquidation queue not in anchor crate... probably have to import from github
         ExecuteMsg::SubmitBid { collateral_token, premium_slot } => Ok(Response::new()),
         ExecuteMsg::RetractBid {bid_idx, amount} => Ok(Response::new()),
         ExecuteMsg::ActivateBids {collateral_token, bids_idx} => Ok(Response::new()),
@@ -86,26 +88,86 @@ pub fn receive_cw20(
     cw20_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
     let contract_addr = info.sender;
+    let config: Config = CONFIG.load(deps.storage)?;
 
     match from_binary(&cw20_msg.msg) {
         Ok(Cw20HookMsg::RedeemStable {}) => {
             // aust check
 
             let cw20_sender_addr = deps.api.addr_validate(&cw20_msg.sender)?;
-            //redeem_stable(deps, cw20_sender_addr, cw20_msg.amount.into())
-            Ok(Response::new())
+            redeem_stable(deps, cw20_sender_addr, cw20_msg.amount.into())
         },
 
         Ok(Cw20HookMsg::DepositCollateral {}) => {
             // anchor-whitelisted collateral check
+        
+            let custody_contract = &config
+                .custody_contracts
+                .iter()
+                .find(|x| x.address == contract_addr.clone())
+                .ok_or_else(||{
+                    ContractError::Unauthorized{}
+                })?.address;
 
             let cw20_sender_addr = deps.api.addr_validate(&cw20_msg.sender)?;
-            //deposit_collateral(deps, cw20_sender_addr, cw20_msg.amount.into())
-            Ok(Response::new())
+            deposit_collateral(deps, cw20_sender_addr, cw20_msg.amount.into(), custody_contract, contract_addr, config.overseer_contract)
         },
 
         _ => Err(ContractError::InvalidReceiveMsg {}),
     }
+}
+
+pub fn deposit_collateral(
+    deps: DepsMut,
+    cw20_sender_addr: Addr,
+    amount: Uint256,
+    custody_contract: &Addr,
+    collateral_token: Addr,
+    overseer_contract: Addr,
+) -> Result<Response, ContractError>{
+
+    let config: Config = CONFIG.load(deps.storage)?;
+
+    let deposit_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: collateral_token.clone().into(),
+        funds: vec![],
+        msg: to_binary(&Cw20ExecuteMsg::Send{
+            contract: custody_contract.into(),
+            amount: amount.into(),
+            msg: to_binary(&CustodyHookMsg::DepositCollateral{})?,
+        })?,
+    });
+
+    let lock_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: overseer_contract.into(),
+        funds: vec![],
+        msg: to_binary(&OverseerExecuteMsg::LockCollateral{
+            collaterals: vec![(collateral_token.to_string(), amount)]
+        })?,
+    });
+
+    Ok(Response::new().add_attributes(vec![("action", "market_redeem_stable")]).add_messages(vec![deposit_msg, lock_msg]))
+}
+
+pub fn redeem_stable(
+    deps: DepsMut,
+    cw20_sender_addr: Addr,
+    amount: Uint256,
+) -> Result<Response, ContractError>{
+
+    let config: Config = CONFIG.load(deps.storage)?;
+
+    let redeem_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: config.aust_address.into(),
+        funds: vec![],
+        msg: to_binary(&Cw20ExecuteMsg::Send{
+            contract: config.market_contract.into(),
+            amount: amount.into(),
+            msg: to_binary(&AnchorHookMsg::RedeemStable{})?,
+        })?,
+    });
+
+    Ok(Response::new().add_attributes(vec![("action", "market_redeem_stable")]).add_message(redeem_msg))
 }
 
 pub fn execute_withdraw_collateral(

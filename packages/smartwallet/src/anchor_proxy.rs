@@ -13,7 +13,7 @@ pub struct InstantiateMsg {
     pub overseer_contract: String,
     pub custody_contracts: Vec<CustodyContractInfo>,
     pub liquidation_contract: String,
-
+    pub aust_address: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -13,7 +13,7 @@ pub struct Config {
     pub overseer_contract: Addr,
     pub custody_contracts: Vec<CustodyContractInfo>,
     pub liquidation_contract: Addr,
-
+    pub aust_address: Addr,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
