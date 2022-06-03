@@ -1,2 +1,2 @@
 pub mod wallet;
-pub mod anchor_proxy;
+pub mod astroport_proxy;
