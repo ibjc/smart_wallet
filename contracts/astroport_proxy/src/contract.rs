@@ -6,7 +6,8 @@ use cosmwasm_std::{
 
 use cosmwasm_bignumber::Uint256;
 
-use smartwallet::astroport_proxy::{ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, BalanceCheckResponse, RawActionsResponse};
+use smartwallet::astroport_proxy::{ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, BalanceCheckResponse};
+use smartwallet::wallet::RawActionsResponse;
 
 use crate::state::{CONFIG, Config, CustodyContractInfo as StateCustodyContractInfo};
 use moneymarket::{
@@ -50,8 +51,6 @@ pub fn execute(
         } => execute_update_config(deps, env, info, owner),
     }
 }
-
-
 
 pub fn execute_update_config(
     deps: DepsMut,
@@ -113,20 +112,3 @@ pub fn query_fabricate_provide_msg(deps: Deps, env: Env, pair_address: String, f
         }],
     });
 }
-
-pub fn query_fabricate_withdraw_msg(deps: Deps, env: Env, address: String) -> StdResult<BalanceCheckResponse> {
-    todo!()
-}
-
-pub fn query_fabricate_stake_msg(deps: Deps, env: Env, address: String) -> StdResult<BalanceCheckResponse> {
-    todo!()
-}
-
-pub fn query_fabricate_unstake_msg(deps: Deps, env: Env, address: String) -> StdResult<BalanceCheckResponse> {
-    todo!()
-}
-
-pub fn query_fabricate_vote_msg(deps: Deps, env: Env, address: String) -> StdResult<BalanceCheckResponse> {
-    todo!()
-}
-

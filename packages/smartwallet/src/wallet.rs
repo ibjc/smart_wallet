@@ -52,7 +52,7 @@ pub enum ExecuteMsg {
     RepayStable {amount: Uint128}, //id=2
 
     //forwarding hot msgs
-    ExecuteHotCommand {contract_address: String, funds: Vec<Coin>, command: Binary}, //execute whitelisted wasm message
+    ExecuteHotCommand {contract_address: String, command: Binary}, //execute whitelisted wasm message
     FillUpGas {}, // no id check
 
     //hot wallet mgmt; consider making a vector later on with a label field
@@ -114,3 +114,7 @@ pub struct HotWalletStateResponse {
     pub gas_time_left: u64,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct RawActionsResponse {
+    pub actions: Vec<WasmMsg>,
+}

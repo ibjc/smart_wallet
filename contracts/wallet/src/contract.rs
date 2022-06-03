@@ -2,11 +2,11 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError
+    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError, WasmQuery, QueryRequest
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, Cw3InstantiateMsg, MultiSigVoter, Duration
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, Cw3InstantiateMsg, MultiSigVoter, Duration, RawActionsResponse
 };
 use protobuf::Message;
 use crate::response::MsgInstantiateContractResponse;
@@ -129,7 +129,7 @@ pub fn execute(
         ExecuteMsg::RepayStable{amount} => execute_repay_stable(deps, info, amount), //id=2
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
         
-        ExecuteMsg::ExecuteHotCommand {contract_address, funds, command} => execute_hot_command(deps, info, contract_address, funds, command), //execute whitelisted wasm message
+        ExecuteMsg::ExecuteHotCommand {contract_address, command} => execute_hot_command(deps, info, contract_address, command), //execute whitelisted wasm message
 
         //hot wallet mgmt
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),
@@ -151,7 +151,6 @@ pub fn execute_hot_command(
     deps: DepsMut,
     info: MessageInfo,
     contract_address: String,
-    funds: Vec<Coin>,
     command: Binary,
 ) -> Result<Response, ContractError> {
 
@@ -164,20 +163,21 @@ pub fn execute_hot_command(
         return Err(ContractError::Unauthorized{});
     }
 
-    let destination_contract = config.whitelisted_contracts.iter().find(|&x| x.address == contract_address.clone());
+    let proxy_contract = config.whitelisted_contracts.iter().find(|&x| x.address == contract_address.clone());
 
     //contract check
-    if destination_contract.is_none(){
+    if proxy_contract.is_none(){
         return Err(ContractError::ContractNotWhitelisted{});
     }
 
-    let hot_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: destination_contract.unwrap().address.clone(),
-        funds: funds,
+    //smart wallet makes the query call, and gets a wasm execute binary
+    let fabricated_messages: RawActionsResponse = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart{
+        contract_addr: proxy_contract.unwrap().address.clone(),
         msg: command,
-    });
+    }))?;
 
-    Ok(Response::new().add_attributes(vec![("action", "hot_command")]).add_message(hot_msg))
+    //smart wallet then invokes the binary
+    Ok(Response::new().add_attributes(vec![("action", "hot_command")]).add_messages(fabricated_messages.actions))
 }
 
 
