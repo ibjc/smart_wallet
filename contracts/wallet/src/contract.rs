@@ -2,21 +2,20 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env,
-    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError, 
+    MessageInfo, Response, StdResult, Uint128, Addr, BankMsg, WasmMsg, CosmosMsg, Coin, SubMsg, Reply, StdError, WasmQuery, QueryRequest
 };
 
 use smartwallet::wallet::{
-    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, Cw3InstantiateMsg, MultiSigVoter, Duration
+    ExecuteMsg, InstantiateMsg, QueryMsg, ConfigResponse, HotWallet, HotWalletStateResponse, WhitelistedContract, Cw3InstantiateMsg, MultiSigVoter, Duration, RawActionsResponse
 };
-
+use protobuf::Message;
+use crate::response::MsgInstantiateContractResponse;
 use crate::state::{CONFIG, HOT_WALLETS, Config, HotWalletState};
 use std::cmp::{min, max};
 use crate::tax_querier::{query_balance, deduct_tax};
 use moneymarket::market::ExecuteMsg::{DepositStable, RepayStable};
 use basset::reward::ExecuteMsg::ClaimRewards;
 use crate::error::ContractError;
-use protobuf::Message;
-use crate::response::MsgInstantiateContractResponse;
 
 pub const GAS_BUFFER: u64 = 100000000u64;
 pub const ANCHOR_MARKET_CONTRACT: &str = "anchor_market";
@@ -115,8 +114,6 @@ pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contrac
     }
 }
 
-
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -131,11 +128,14 @@ pub fn execute(
         ExecuteMsg::BlunaClaim{} => execute_bluna_claim_rewards(deps, info), //id=1
         ExecuteMsg::RepayStable{amount} => execute_repay_stable(deps, info, amount), //id=2
         ExecuteMsg::FillUpGas{} => execute_fill_up_gas(deps, env, info), //any
+        
+        ExecuteMsg::ExecuteHotCommand {contract_address, command} => execute_hot_command(deps, info, contract_address, command), //execute whitelisted wasm message
 
         //hot wallet mgmt
         ExecuteMsg::RemoveHot {address} => execute_remove_hot(deps, info, address),
         ExecuteMsg::UpsertHot {hot_wallet} => execute_upsert_hot(deps, info, hot_wallet),
         ExecuteMsg::ReplaceContractWhitelist { whitelisted_contracts } => execute_replace_contracts(deps, info, whitelisted_contracts),
+
 
         //update multsig
         ExecuteMsg::ReplaceMultisig {address} => execute_replace_multisig(deps, info, address),
@@ -143,6 +143,41 @@ pub fn execute(
         //generalized exec for multisig
         ExecuteMsg::Execute {command} => execute_command(deps, info, command),
     }
+}
+
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_hot_command(
+    deps: DepsMut,
+    info: MessageInfo,
+    contract_address: String,
+    command: Binary,
+) -> Result<Response, ContractError> {
+
+    let config: Config = CONFIG.load(deps.storage)?;
+
+    let hot_wallet_config = config.hot_wallets.iter().find(|&x| x.address == info.sender.to_string());
+
+    //hot wallet check
+    if hot_wallet_config.is_none(){
+        return Err(ContractError::Unauthorized{});
+    }
+
+    let proxy_contract = config.whitelisted_contracts.iter().find(|&x| x.address == contract_address.clone());
+
+    //contract check
+    if proxy_contract.is_none(){
+        return Err(ContractError::ContractNotWhitelisted{});
+    }
+
+    //smart wallet makes the query call, and gets a wasm execute binary
+    let fabricated_messages: RawActionsResponse = deps.querier.query(&QueryRequest::Wasm(WasmQuery::Smart{
+        contract_addr: proxy_contract.unwrap().address.clone(),
+        msg: command,
+    }))?;
+
+    //smart wallet then invokes the binary
+    Ok(Response::new().add_attributes(vec![("action", "hot_command")]).add_messages(fabricated_messages.actions))
 }
 
 
